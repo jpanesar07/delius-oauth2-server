@@ -18,6 +18,7 @@ import uk.gov.service.notify.NotificationClientException;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static uk.gov.justice.digital.hmpps.oauth2server.auth.model.UserToken.TokenType.RESET;
@@ -95,6 +96,35 @@ public class ResetPasswordController extends AbstractPasswordController {
     public ModelAndView resetPasswordConfirmInPath(@PathVariable final String token) {
         // can be removed after go live on the below method instead
         return resetPasswordConfirm(token);
+    }
+
+    @GetMapping("/reset-password-select")
+    public ModelAndView resetPasswordSelect(@RequestParam final String token) {
+        final var userTokenOptional = tokenService.checkToken(RESET, token);
+        return userTokenOptional.map(s -> new ModelAndView("resetPassword", "error", s)).
+                orElseGet(() -> new ModelAndView("enterUsername", "token", token));
+    }
+
+    @GetMapping("/reset-password-username")
+    public ModelAndView resetPasswordUsername(@RequestParam final String token, @RequestParam final String username) {
+        // validate username
+        if (StringUtils.isBlank(username)) {
+            telemetryClient.trackEvent("ResetPasswordUsernameFailure", Map.of("error", "missing"), null);
+            return new ModelAndView("enterUsername", "error", "missing");
+        }
+        if (username.indexOf('@') != -1) {
+            telemetryClient.trackEvent("ResetPasswordUsernameFailure", Map.of("error", "format", "username", username), null);
+            return new ModelAndView("enterUsername", "error", "format");
+        }
+
+        // TODO: can I move a token from one user to a different one?
+        final Optional<String> newToken = resetPasswordService.createTokenForUsername(token, username);
+
+
+
+        final var userTokenOptional = tokenService.checkToken(RESET, token);
+        return userTokenOptional.map(s -> new ModelAndView("resetPassword", "error", s)).
+                orElseGet(() -> new ModelAndView("enterUsername", "token", token));
     }
 
     @GetMapping("/reset-password-confirm")

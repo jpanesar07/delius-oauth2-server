@@ -1,12 +1,12 @@
 package uk.gov.justice.digital.hmpps.oauth2server.verify;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.thymeleaf.util.StringUtils;
 import uk.gov.justice.digital.hmpps.oauth2server.auth.model.UserEmail;
 import uk.gov.justice.digital.hmpps.oauth2server.auth.model.UserToken;
 import uk.gov.justice.digital.hmpps.oauth2server.auth.model.UserToken.TokenType;
@@ -147,5 +147,40 @@ public class ResetPasswordService implements PasswordService {
 
         userEmailRepository.save(userEmail);
         userTokenRepository.delete(userToken);
+    }
+
+    public Optional<String> createTokenForUsername(final String token, final String username) {
+        final var userEmailOptional = userEmailRepository.findById(StringUtils.upperCase(username));
+
+
+        if (userEmailOptional.isEmpty()) {
+            // TODO: check username exists and is in correct state - can inform user if not
+            return Optional.empty();
+        }
+
+        final var emailForUsername = userEmailOptional.get().getEmail();
+        // grab email address from token
+        final var userTokenOptional = userTokenRepository.findById(token);
+
+        // TODO: check token in correct state
+        if (userTokenOptional.isEmpty()) {
+            return Optional.empty();
+        }
+        // simple case - token corresponds to username so can just be returned
+        if (userTokenOptional.get().getUserEmail().getUsername().equalsIgnoreCase(username)) {
+            return Optional.of(token);
+        }
+
+        final var emailForToken = userTokenOptional.get().getUserEmail().getEmail();
+        if (emailForToken.equalsIgnoreCase(emailForUsername)) {
+            // found a match of email address for other account so need to move token to other user account
+
+            // TODO: move token
+            return Optional.empty();
+        }
+
+        // so can't find a match for the username with that email address
+        // TODO: inform user no match found
+        return Optional.empty();
     }
 }
